@@ -12,70 +12,57 @@
   <p id="status"></p>
   <audio id="responseAudio" controls></audio>
 
+  <!-- RecordRTC library -->
+  <script src="https://cdn.webrtc-experiment.com/RecordRTC.js"></script>
   <script>
-    let mediaRecorder;
-    let audioChunks = [];
+    let recorder;
     const startBtn = document.getElementById('startBtn');
     const stopBtn = document.getElementById('stopBtn');
     const statusP = document.getElementById('status');
 
-    startBtn.addEventListener('click', async () => {
-      statusP.innerText = "Đang thu âm...";
-      audioChunks = [];
+    startBtn.onclick = async () => {
+      statusP.innerText = 'Đang thu âm...';
       try {
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        mediaRecorder = new MediaRecorder(stream);
-        mediaRecorder.ondataavailable = e => {
-          console.log('ondataavailable, size=', e.data.size);
-          if (e.data && e.data.size > 0) audioChunks.push(e.data);
-        };
-        mediaRecorder.onstart = () => console.log('Recorder started');
-        mediaRecorder.onstop = () => console.log('Recorder stopped');
-        mediaRecorder.start();  // start without timeslice
+        recorder = RecordRTC(stream, {
+          type: 'audio',
+          mimeType: 'audio/wav',
+          recorderType: StereoAudioRecorder,
+          numberOfAudioChannels: 1,
+          timeSlice: 1000,
+        });
+        recorder.startRecording();
         startBtn.disabled = true;
         stopBtn.disabled = false;
       } catch (err) {
-        statusP.innerText = "Lỗi truy cập mic: " + err;
+        statusP.innerText = 'Lỗi truy cập mic: ' + err;
         console.error(err);
       }
-    });
+    };
 
-    stopBtn.addEventListener('click', () => {
-      statusP.innerText = "Đang xử lý...";
-      if (!mediaRecorder) return;
-      mediaRecorder.stop();
+    stopBtn.onclick = () => {
+      statusP.innerText = 'Đang xử lý...';
       stopBtn.disabled = true;
-
-      mediaRecorder.onstop = () => {
-        console.log('onstop event, chunks:', audioChunks.length);
-        if (audioChunks.length === 0) {
-          statusP.innerText = "Không có dữ liệu ghi âm.";
-          startBtn.disabled = false;
-          return;
-        }
-
-        const blob = new Blob(audioChunks);
-        console.log('Final blob size:', blob.size);
+      recorder.stopRecording(async () => {
+        const blob = recorder.getBlob();
+        console.log('Recorded blob size:', blob.size, 'type:', blob.type);
         const formData = new FormData();
-        formData.append('audio', blob, 'recording.webm');
-
-        fetch('/process', { method: 'POST', body: formData })
-          .then(res => res.blob())
-          .then(blobResp => {
-            const url = URL.createObjectURL(blobResp);
-            const audioEl = document.getElementById('responseAudio');
-            audioEl.src = url;
-            audioEl.play();
-            statusP.innerText = "Đã xử lý xong ✅";
-            startBtn.disabled = false;
-          })
-          .catch(err => {
-            statusP.innerText = "Lỗi xử lý: " + err;
-            console.error(err);
-            startBtn.disabled = false;
-          });
-      };
-    });
+        formData.append('audio', blob, 'recording.wav');
+        try {
+          const res = await fetch('/process', { method: 'POST', body: formData });
+          const audioBlob = await res.blob();
+          const url = URL.createObjectURL(audioBlob);
+          const audioEl = document.getElementById('responseAudio');
+          audioEl.src = url;
+          audioEl.play();
+          statusP.innerText = 'Đã xử lý xong ✅';
+        } catch (err) {
+          statusP.innerText = 'Lỗi xử lý: ' + err;
+          console.error(err);
+        }
+        startBtn.disabled = false;
+      });
+    };
   </script>
 </body>
 </html>
