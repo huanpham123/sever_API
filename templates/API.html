@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Voice Chat with Gemini</title>
+  <title>Voice Chat với Gemini</title>
 </head>
 <body>
   <h1>Thu âm và hỏi Gemini</h1>
@@ -23,13 +23,13 @@
       audioChunks = [];
       try {
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
-        mediaRecorder.start();
-        startBtn.disabled = true;
-        stopBtn.disabled = false;
+        mediaRecorder = new MediaRecorder(stream);
         mediaRecorder.ondataavailable = e => {
           if (e.data.size > 0) audioChunks.push(e.data);
         };
+        mediaRecorder.start(); // Bắt đầu ghi âm
+        startBtn.disabled = true;
+        stopBtn.disabled = false;
       } catch (err) {
         document.getElementById('status').innerText = "Lỗi truy cập mic: " + err;
       }
@@ -37,19 +37,28 @@
 
     stopBtn.addEventListener('click', () => {
       document.getElementById('status').innerText = "Đang xử lý...";
+      if (!mediaRecorder) return;
       mediaRecorder.stop();
       stopBtn.disabled = true;
+
       mediaRecorder.onstop = () => {
-        const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+        // Kiểm tra xem audioChunks có dữ liệu không
+        if (audioChunks.length === 0) {
+          document.getElementById('status').innerText = "Không có dữ liệu ghi âm.";
+          startBtn.disabled = false;
+          return;
+        }
+
+        const audioBlob = new Blob(audioChunks, { type: audioChunks[0].type });
         const formData = new FormData();
         formData.append('audio', audioBlob, 'recording.webm');
+
         fetch('/process', { method: 'POST', body: formData })
           .then(res => res.blob())
           .then(blob => {
             const url = URL.createObjectURL(blob);
-            const audio = document.getElementById('responseAudio');
-            audio.src = url;
-            audio.play();
+            document.getElementById('responseAudio').src = url;
+            document.getElementById('responseAudio').play();
             document.getElementById('status').innerText = "Đã xử lý xong ✅";
             startBtn.disabled = false;
           })
