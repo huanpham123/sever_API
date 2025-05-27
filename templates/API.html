@@ -17,53 +17,61 @@
     let audioChunks = [];
     const startBtn = document.getElementById('startBtn');
     const stopBtn = document.getElementById('stopBtn');
+    const statusP = document.getElementById('status');
 
     startBtn.addEventListener('click', async () => {
-      document.getElementById('status').innerText = "Đang thu âm...";
+      statusP.innerText = "Đang thu âm...";
       audioChunks = [];
       try {
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
         mediaRecorder = new MediaRecorder(stream);
         mediaRecorder.ondataavailable = e => {
-          if (e.data.size > 0) audioChunks.push(e.data);
+          console.log('ondataavailable, size=', e.data.size);
+          if (e.data && e.data.size > 0) audioChunks.push(e.data);
         };
-        mediaRecorder.start(); // Bắt đầu ghi âm
+        mediaRecorder.onstart = () => console.log('Recorder started');
+        mediaRecorder.onstop = () => console.log('Recorder stopped');
+        mediaRecorder.start();  // start without timeslice
         startBtn.disabled = true;
         stopBtn.disabled = false;
       } catch (err) {
-        document.getElementById('status').innerText = "Lỗi truy cập mic: " + err;
+        statusP.innerText = "Lỗi truy cập mic: " + err;
+        console.error(err);
       }
     });
 
     stopBtn.addEventListener('click', () => {
-      document.getElementById('status').innerText = "Đang xử lý...";
+      statusP.innerText = "Đang xử lý...";
       if (!mediaRecorder) return;
       mediaRecorder.stop();
       stopBtn.disabled = true;
 
       mediaRecorder.onstop = () => {
-        // Kiểm tra xem audioChunks có dữ liệu không
+        console.log('onstop event, chunks:', audioChunks.length);
         if (audioChunks.length === 0) {
-          document.getElementById('status').innerText = "Không có dữ liệu ghi âm.";
+          statusP.innerText = "Không có dữ liệu ghi âm.";
           startBtn.disabled = false;
           return;
         }
 
-        const audioBlob = new Blob(audioChunks, { type: audioChunks[0].type });
+        const blob = new Blob(audioChunks);
+        console.log('Final blob size:', blob.size);
         const formData = new FormData();
-        formData.append('audio', audioBlob, 'recording.webm');
+        formData.append('audio', blob, 'recording.webm');
 
         fetch('/process', { method: 'POST', body: formData })
           .then(res => res.blob())
-          .then(blob => {
-            const url = URL.createObjectURL(blob);
-            document.getElementById('responseAudio').src = url;
-            document.getElementById('responseAudio').play();
-            document.getElementById('status').innerText = "Đã xử lý xong ✅";
+          .then(blobResp => {
+            const url = URL.createObjectURL(blobResp);
+            const audioEl = document.getElementById('responseAudio');
+            audioEl.src = url;
+            audioEl.play();
+            statusP.innerText = "Đã xử lý xong ✅";
             startBtn.disabled = false;
           })
           .catch(err => {
-            document.getElementById('status').innerText = "Lỗi xử lý: " + err;
+            statusP.innerText = "Lỗi xử lý: " + err;
+            console.error(err);
             startBtn.disabled = false;
           });
       };
