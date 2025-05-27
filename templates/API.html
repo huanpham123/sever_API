@@ -1,134 +1,93 @@
 <!DOCTYPE html>
 <html lang="vi">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Voice Chat với Gemini</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Voice Chat AI</title>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; }
+        button { padding: 10px 15px; margin: 5px; font-size: 16px; cursor: pointer; }
+        #status { margin: 15px 0; color: #666; }
+        #responseAudio { width: 100%; margin-top: 20px; }
+    </style>
 </head>
 <body>
-  <h1>Thu âm và hỏi Gemini</h1>
-  <button id="startBtn">🎙️ Bắt đầu thu âm</button>
-  <button id="stopBtn" disabled>🛑 Dừng và gửi</button>
-  <p id="status">Trạng thái: Sẵn sàng</p>
-  <audio id="responseAudio" controls></audio>
+    <h1>Voice Chat với AI</h1>
+    <button id="startBtn">🎤 Bắt đầu thu âm</button>
+    <button id="stopBtn" disabled>⏹ Dừng và gửi</button>
+    <p id="status">Nhấn nút để bắt đầu thu âm...</p>
+    <audio id="responseAudio" controls></audio>
 
-  <!-- Sử dụng phiên bản mới nhất của RecordRTC -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/RecordRTC/5.6.2/RecordRTC.min.js"></script>
-  <script>
-    let recorder;
-    let audioStream;
-    const startBtn = document.getElementById('startBtn');
-    const stopBtn = document.getElementById('stopBtn');
-    const statusP = document.getElementById('status');
-    const responseAudio = document.getElementById('responseAudio');
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/RecordRTC/5.6.2/RecordRTC.min.js"></script>
+    <script>
+        let recorder;
+        let audioStream;
+        const startBtn = document.getElementById('startBtn');
+        const stopBtn = document.getElementById('stopBtn');
+        const statusEl = document.getElementById('status');
+        const audioEl = document.getElementById('responseAudio');
 
-    // Kiểm tra trình duyệt hỗ trợ
-    function checkBrowserSupport() {
-      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        statusP.innerText = 'Trình duyệt không hỗ trợ ghi âm';
-        startBtn.disabled = true;
-        return false;
-      }
-      return true;
-    }
-    checkBrowserSupport();
-
-    startBtn.onclick = async () => {
-      if (!checkBrowserSupport()) return;
-      
-      statusP.innerText = 'Đang yêu cầu quyền truy cập mic...';
-      try {
-        audioStream = await navigator.mediaDevices.getUserMedia({ 
-          audio: {
-            echoCancellation: true,
-            noiseSuppression: true,
-            channelCount: 1
-          }
-        });
-        
-        statusP.innerText = 'Đang thu âm...';
-        
-        // Khởi tạo recorder với định dạng WebM (được hỗ trợ rộng rãi)
-        recorder = new RecordRTC(audioStream, {
-          type: 'audio',
-          mimeType: 'audio/webm',
-          sampleRate: 16000,
-          desiredSampRate: 16000,
-          numberOfAudioChannels: 1,
-          timeSlice: 1000,
-          recorderType: RecordRTC.StereoAudioRecorder
-        });
-        
-        recorder.startRecording();
-        startBtn.disabled = true;
-        stopBtn.disabled = false;
-      } catch (err) {
-        statusP.innerText = 'Lỗi: ' + err.message;
-        console.error('Lỗi khi bắt đầu ghi âm:', err);
-        startBtn.disabled = false;
-      }
-    };
-
-    stopBtn.onclick = async () => {
-      if (!recorder) return;
-      
-      statusP.innerText = 'Đang dừng ghi âm...';
-      stopBtn.disabled = true;
-      
-      try {
-        // Dừng ghi âm và lấy dữ liệu
-        await new Promise((resolve) => {
-          recorder.stopRecording(resolve);
-        });
-        
-        // Dừng các track âm thanh
-        audioStream.getTracks().forEach(track => track.stop());
-        
-        statusP.innerText = 'Đang gửi dữ liệu...';
-        console.log('Đã ghi âm xong, đang gửi dữ liệu...');
-        
-        // Lấy blob âm thanh
-        const blob = recorder.getBlob();
-        console.log('Kích thước blob:', blob.size, 'bytes', 'Loại:', blob.type);
-        
-        // Gửi lên server
-        const formData = new FormData();
-        formData.append('audio', blob, 'recording.webm');
-        
-        const res = await fetch('/process', {
-          method: 'POST',
-          body: formData
-        });
-        
-        if (!res.ok) {
-          throw new Error(`Lỗi server: ${res.status}`);
-        }
-        
-        // Xử lý phản hồi
-        const audioBlob = await res.blob();
-        console.log('Nhận được audio phản hồi:', audioBlob.size, 'bytes', 'Loại:', audioBlob.type);
-        
-        const audioUrl = URL.createObjectURL(audioBlob);
-        responseAudio.src = audioUrl;
-        responseAudio.onerror = () => {
-          statusP.innerText = 'Lỗi phát âm thanh';
-          console.error('Không thể phát âm thanh');
+        startBtn.onclick = async () => {
+            try {
+                statusEl.textContent = 'Đang yêu cầu quyền mic...';
+                audioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                
+                statusEl.textContent = 'Đang thu âm...';
+                startBtn.disabled = true;
+                stopBtn.disabled = false;
+                
+                recorder = new RecordRTC(audioStream, {
+                    type: 'audio',
+                    mimeType: 'audio/webm',
+                    sampleRate: 16000,
+                    numberOfAudioChannels: 1
+                });
+                
+                recorder.startRecording();
+            } catch (err) {
+                statusEl.textContent = 'Lỗi: ' + err.message;
+                console.error(err);
+                startBtn.disabled = false;
+            }
         };
-        
-        // Tự động phát
-        responseAudio.play().catch(err => {
-          statusP.innerText = 'Lỗi khi phát âm thanh: ' + err.message;
-          console.error('Lỗi phát âm thanh:', err);
-        });
-        
-        statusP.innerText = 'Hoàn thành! Nhấn nút thu âm để tiếp tục';
-      } catch (err) {
-        statusP.innerText = 'Lỗi: ' + err.message;
-        console.error('Lỗi trong quá trình xử lý:', err);
-      } finally {
-        startBtn.disabled = false;
-      }
-    };
-  </script>
+
+        stopBtn.onclick = async () => {
+            try {
+                statusEl.textContent = 'Đang xử lý...';
+                stopBtn.disabled = true;
+                
+                await new Promise(resolve => {
+                    recorder.stopRecording(resolve);
+                });
+                
+                // Dừng các track audio
+                audioStream.getTracks().forEach(track => track.stop());
+                
+                const blob = recorder.getBlob();
+                const formData = new FormData();
+                formData.append('audio', blob, 'recording.webm');
+                
+                const response = await fetch('/process', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                if (!response.ok) {
+                    throw new Error(await response.text());
+                }
+                
+                const audioBlob = await response.blob();
+                audioEl.src = URL.createObjectURL(audioBlob);
+                audioEl.play();
+                
+                statusEl.textContent = 'Hoàn thành! Nhấn để thu âm lại';
+            } catch (err) {
+                statusEl.textContent = 'Lỗi: ' + err.message;
+                console.error(err);
+            } finally {
+                startBtn.disabled = false;
+            }
+        };
+    </script>
 </body>
 </html>
