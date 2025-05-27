@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Voice Chat with Gemini</title>
+</head>
+<body>
+  <h1>Thu âm và hỏi Gemini</h1>
+  <button onclick="startRecording()">🎙️ Bắt đầu thu âm</button>
+  <button onclick="stopRecording()">🛑 Dừng và gửi</button>
+  <p id="status"></p>
+  <audio id="responseAudio" controls></audio>
+
+  <script>
+    let mediaRecorder;
+    let audioChunks = [];
+
+    function startRecording() {
+      document.getElementById('status').innerText = "Đang thu âm...";
+      navigator.mediaDevices.getUserMedia({ audio: true })
+        .then(stream => {
+          mediaRecorder = new MediaRecorder(stream);
+          mediaRecorder.start();
+
+          mediaRecorder.ondataavailable = event => audioChunks.push(event.data);
+        });
+    }
+
+    function stopRecording() {
+      document.getElementById('status').innerText = "Đang xử lý...";
+      mediaRecorder.stop();
+
+      mediaRecorder.onstop = () => {
+        const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
+        const formData = new FormData();
+        formData.append('audio', audioBlob, 'recording.wav');
+
+        fetch('/process', { method: 'POST', body: formData })
+          .then(res => res.blob())
+          .then(blob => {
+            const url = URL.createObjectURL(blob);
+            const audio = document.getElementById('responseAudio');
+            audio.src = url;
+            audio.play();
+            document.getElementById('status').innerText = "Đã xử lý xong ✅";
+          });
+
+        audioChunks = [];
+      };
+    }
+  </script>
+</body>
+</html>
