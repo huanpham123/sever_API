@@ -13,7 +13,7 @@ TTS_API_URL = "https://tts-api-tnhy.vercel.app/api/tts"
 @app.route('/')
 def index():
     # Render trang front-end
-    return render_template('index.html')
+    return render_template('API.html')
 
 @app.route('/process', methods=['POST'])
 def process_audio():
