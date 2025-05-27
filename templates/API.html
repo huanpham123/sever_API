@@ -7,35 +7,42 @@
 </head>
 <body>
   <h1>Thu âm và hỏi Gemini</h1>
-  <button onclick="startRecording()">🎙️ Bắt đầu thu âm</button>
-  <button onclick="stopRecording()">🛑 Dừng và gửi</button>
+  <button id="startBtn">🎙️ Bắt đầu thu âm</button>
+  <button id="stopBtn" disabled>🛑 Dừng và gửi</button>
   <p id="status"></p>
   <audio id="responseAudio" controls></audio>
 
   <script>
     let mediaRecorder;
     let audioChunks = [];
+    const startBtn = document.getElementById('startBtn');
+    const stopBtn = document.getElementById('stopBtn');
 
-    function startRecording() {
+    startBtn.addEventListener('click', async () => {
       document.getElementById('status').innerText = "Đang thu âm...";
-      navigator.mediaDevices.getUserMedia({ audio: true })
-        .then(stream => {
-          mediaRecorder = new MediaRecorder(stream);
-          mediaRecorder.start();
+      audioChunks = [];
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
+        mediaRecorder.start();
+        startBtn.disabled = true;
+        stopBtn.disabled = false;
+        mediaRecorder.ondataavailable = e => {
+          if (e.data.size > 0) audioChunks.push(e.data);
+        };
+      } catch (err) {
+        document.getElementById('status').innerText = "Lỗi truy cập mic: " + err;
+      }
+    });
 
-          mediaRecorder.ondataavailable = event => audioChunks.push(event.data);
-        });
-    }
-
-    function stopRecording() {
+    stopBtn.addEventListener('click', () => {
       document.getElementById('status').innerText = "Đang xử lý...";
       mediaRecorder.stop();
-
+      stopBtn.disabled = true;
       mediaRecorder.onstop = () => {
-        const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
+        const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
         const formData = new FormData();
-        formData.append('audio', audioBlob, 'recording.wav');
-
+        formData.append('audio', audioBlob, 'recording.webm');
         fetch('/process', { method: 'POST', body: formData })
           .then(res => res.blob())
           .then(blob => {
@@ -44,11 +51,14 @@
             audio.src = url;
             audio.play();
             document.getElementById('status').innerText = "Đã xử lý xong ✅";
+            startBtn.disabled = false;
+          })
+          .catch(err => {
+            document.getElementById('status').innerText = "Lỗi xử lý: " + err;
+            startBtn.disabled = false;
           });
-
-        audioChunks = [];
       };
-    }
+    });
   </script>
 </body>
 </html>
